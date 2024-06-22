@@ -32,8 +32,8 @@ router.post('/delete', async function (req, res, next) {
         auth: req.query.token
     })
     const response = await octokit.request('DELETE /repos/{owner}/{repo}', {
-        owner: req.query.owner,   // The account owner of the repository. The name is not case-sensitive.
-        repo: req.query.repo,   // The name of the repository without the .git extension. The name is not case-sensitive.
+        owner: req.query.owner,   // The account owner of the repository.
+        repo: req.query.repo,   // The name of the repository without the .git extension.
         headers: {
             'X-GitHub-Api-Version': '2022-11-28',
             'accept': 'application/vnd.github+json'
