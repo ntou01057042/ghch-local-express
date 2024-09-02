@@ -7,6 +7,7 @@ var cors = require('cors')
 var indexRouter = require('./routes/index');
 var repoRouter = require('./routes/repo');
 var collaboratorRouter = require('./routes/collab');
+var prRouter = require('./routes/pr');
 
 var app = express();
 
@@ -20,5 +21,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 app.use('/repo', repoRouter);
 app.use('/collab', collaboratorRouter);
+app.use('/pr', prRouter);
 
 module.exports = app;
