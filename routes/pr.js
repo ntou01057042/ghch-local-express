@@ -83,4 +83,55 @@ router.get('/comments', async function (req, res, next) {
     res.send(comments);
 });
 
+/* List PR reviewers */
+router.get('/reviewers', async function (req, res, next) {
+    const octokit = new Octokit({
+        // auth: req.query.token
+    });
+
+    // Get requested reviewers
+    const requestedReviewersResponse = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers', {
+        owner: req.query.owner,
+        repo: req.query.repo,
+        pull_number: req.query.pull_number,
+        headers: {
+            'X-GitHub-Api-Version': '2022-11-28',
+            'accept': 'application/vnd.github+json'
+        }
+    });
+
+    // Get submitted reviews
+    const reviewsResponse = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews', {
+        owner: req.query.owner,
+        repo: req.query.repo,
+        pull_number: req.query.pull_number,
+        headers: {
+            'X-GitHub-Api-Version': '2022-11-28',
+            'accept': 'application/vnd.github+json'
+        }
+    });
+
+    // Process requested reviewers
+    let reviewers = [];
+    if (requestedReviewersResponse.data.users.length > 0) {
+        requestedReviewersResponse.data.users.forEach(user => {
+            reviewers.push({
+                user: user.login,
+                state: 'PENDING'  // For requested reviewers, status is 'PENDING'
+            });
+        });
+    }
+
+    // Process reviews (reviewers who have already reviewed)
+    if (reviewsResponse.data.length > 0) {
+        reviewsResponse.data.forEach(review => {
+            reviewers.push({
+                user: review.user.login,
+                state: review.state  // The state can be APPROVED, CHANGES_REQUESTED, or COMMENTED
+            });
+        });
+    }
+
+    res.send(reviewers);
+});
 module.exports = router;
