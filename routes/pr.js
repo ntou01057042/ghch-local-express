@@ -134,4 +134,37 @@ router.get('/reviewers', async function (req, res, next) {
 
     res.send(reviewers);
 });
+
+/* comment API */
+router.post('/comment', async function (req, res, next) {
+    const { owner, repo, pull_number, body } = req.body;
+    const octokit = new Octokit({
+        auth: req.query.token
+    });
+
+    try {
+        // 提交評論到對應的 PR
+        const response = await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
+            owner,
+            repo,
+            issue_number: pull_number, // PR number also serves as issue number for comments
+            body, // Comment text
+            headers: {
+                'X-GitHub-Api-Version': '2022-11-28',
+                'accept': 'application/vnd.github+json'
+            }
+        });
+
+        // 返回提交的評論資料
+        res.json({
+            id: response.data.id,
+            user: response.data.user.login,
+            created_at: response.data.created_at,
+            body: response.data.body
+        });
+    } catch (error) {
+        console.error("無法提交評論", error);
+        res.status(500).send({ error: '無法提交評論' });
+    }
+});
 module.exports = router;
