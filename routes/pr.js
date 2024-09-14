@@ -167,4 +167,32 @@ router.post('/comment', async function (req, res, next) {
         res.status(500).send({ error: '無法提交評論' });
     }
 });
+
+
+/* 邀請 reviewer API */
+router.post('/invite-reviewer', async function (req, res, next) {
+    const { owner, repo, pull_number, reviewers } = req.body;
+    const octokit = new Octokit({
+        auth: req.query.token
+    });
+
+    try {
+        const response = await octokit.request('POST /repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers', {
+            owner,
+            repo,
+            pull_number,
+            reviewers,
+            headers: {
+                'X-GitHub-Api-Version': '2022-11-28',
+                'accept': 'application/vnd.github+json'
+            }
+        });
+
+        res.send({ message: 'Reviewers successfully invited', data: response.data });
+    } catch (error) {
+        console.error("無法邀請 reviewers", error);
+        res.status(500).send({ error: '無法邀請 reviewers' });
+    }
+});
+
 module.exports = router;
