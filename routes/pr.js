@@ -52,6 +52,7 @@ router.get('/get', async function (req, res, next) {
         description: response.data.body,
         head: response.data.head.ref,
         base: response.data.base.ref,
+        creator: response.data.user.login,  // Return the PR creator's username
     });
 });
 
