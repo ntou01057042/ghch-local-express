@@ -6,7 +6,7 @@ var router = express.Router();
 // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests
 router.get('/list', async function (req, res, next) {
     const octokit = new Octokit({
-        // auth: req.query.token
+        auth: req.query.token
     })
     const response = await octokit.request('GET /repos/{owner}/{repo}/pulls', {
         owner: req.query.owner,   // The account owner of the repository.
@@ -35,7 +35,7 @@ router.get('/list', async function (req, res, next) {
 // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests
 router.get('/get', async function (req, res, next) {
     const octokit = new Octokit({
-        // auth: req.query.token
+        auth: req.query.token
     })
     const response = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
         owner: req.query.owner,   // The account owner of the repository.
@@ -59,7 +59,7 @@ router.get('/get', async function (req, res, next) {
 // https://docs.github.com/en/rest/issues/comments?apiVersion=2022-11-28#list-issue-comments
 router.get('/comments', async function (req, res, next) {
     const octokit = new Octokit({
-        // auth: req.query.token
+        auth: req.query.token
     })
     const response = await octokit.request('GET /repos/{owner}/{repo}/issues/{issue_number}/comments', {
         owner: req.query.owner,   // The account owner of the repository.
