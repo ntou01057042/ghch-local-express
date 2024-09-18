@@ -87,7 +87,7 @@ router.get('/comments', async function (req, res, next) {
 /* List PR reviewers */
 router.get('/reviewers', async function (req, res, next) {
     const octokit = new Octokit({
-        // auth: req.query.token
+         auth: req.query.token
     });
 
     // Get requested reviewers
@@ -193,6 +193,39 @@ router.post('/invite-reviewer', async function (req, res, next) {
     } catch (error) {
         console.error("無法邀請 reviewers", error);
         res.status(500).send({ error: '無法邀請 reviewers' });
+    }
+});
+
+/* 創建審查 API */
+router.post('/create-review', async function (req, res, next) {
+    const { owner, repo, pull_number, body, event } = req.body;
+    const octokit = new Octokit({
+        auth: req.query.token
+    });
+
+    try {
+        const response = await octokit.request('POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews', {
+            owner,
+            repo,
+            pull_number,
+            body,
+            event, // 'APPROVE', 'REQUEST_CHANGES', or 'COMMENT'
+            headers: {
+                'X-GitHub-Api-Version': '2022-11-28',
+                'accept': 'application/vnd.github+json'
+            }
+        });
+
+        res.json({
+            id: response.data.id,
+            user: response.data.user.login,
+            body: response.data.body,
+            state: response.data.state,
+            html_url: response.data.html_url
+        });
+    } catch (error) {
+        console.error("無法創建審查", error);
+        res.status(500).send({ error: '無法創建審查' });
     }
 });
 
