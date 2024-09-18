@@ -87,7 +87,7 @@ router.get('/comments', async function (req, res, next) {
 /* List PR reviewers */
 router.get('/reviewers', async function (req, res, next) {
     const octokit = new Octokit({
-         auth: req.query.token
+        auth: req.query.token
     });
 
     // Get requested reviewers
