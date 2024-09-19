@@ -229,4 +229,34 @@ router.post('/create-review', async function (req, res, next) {
     }
 });
 
+/* Create a pull request */
+// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#create-a-pull-request
+router.post('/', async function (req, res, next) {
+    const octokit = new Octokit({
+        auth: req.query.token
+    });
+    const response = await octokit.request('POST /repos/{owner}/{repo}/pulls', {
+        owner: req.query.owner,   // The account owner of the repository.
+        repo: req.query.repo,   // The name of the repository without the .git extension.
+        title: req.query.title,   // The title of the new pull request. Required unless issue is specified.
+        body: req.query.body,   // The contents of the pull request.
+        head: req.query.head,   // The name of the branch where your changes are implemented.
+        base: 'main',   // The name of the branch you want the changes pulled into.
+        headers: {
+            'X-GitHub-Api-Version': '2022-11-28',
+            'accept': 'application/vnd.github+json'
+        }
+    });
+    console.log(response);
+    // res.send({
+    //     number: response.data.number,
+    //     state: response.data.state,
+    //     description: response.data.body,
+    //     head: response.data.head.ref,
+    //     base: response.data.base.ref,
+    //     creator: response.data.user.login,  // Return the PR creator's username
+    // });
+    res.send(response);
+});
+
 module.exports = router;
