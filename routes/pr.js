@@ -247,16 +247,30 @@ router.post('/', async function (req, res, next) {
             'accept': 'application/vnd.github+json'
         }
     });
-    console.log(response);
-    // res.send({
-    //     number: response.data.number,
-    //     state: response.data.state,
-    //     description: response.data.body,
-    //     head: response.data.head.ref,
-    //     base: response.data.base.ref,
-    //     creator: response.data.user.login,  // Return the PR creator's username
-    // });
+    // console.log(response);
     res.send(response);
+});
+
+/* Check if a pull request has been merged */
+// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#check-if-a-pull-request-has-been-merged
+router.get('/merged-or-not', async function (req, res, next) {
+    const octokit = new Octokit({
+        // auth: req.query.token
+    });
+    try {
+        const response = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}/merge', {
+            owner: req.query.owner,
+            repo: req.query.repo,
+            pull_number: req.query.pull_number,
+            headers: {
+                'X-GitHub-Api-Version': '2022-11-28',
+                'accept': 'application/vnd.github+json'
+            }
+        });
+        res.send(true);
+    } catch (error) {
+        res.send(false);
+    }
 });
 
 module.exports = router;
