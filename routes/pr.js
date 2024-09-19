@@ -273,4 +273,24 @@ router.get('/merged-or-not', async function (req, res, next) {
     }
 });
 
+/* Merge a pull request */
+// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#merge-a-pull-request
+router.post('/merge', async function (req, res, next) {
+    const octokit = new Octokit({
+        auth: req.query.token
+    });
+    const response = await octokit.request('PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge', {
+        owner: req.query.owner,
+        repo: req.query.repo,
+        pull_number: req.query.pull_number,
+        commit_title: req.query.commit_title,  // Title for the automatic commit message.
+        commit_message: req.query.commit_message,  // Extra detail to append to automatic commit message.
+        headers: {
+            'X-GitHub-Api-Version': '2022-11-28',
+            'accept': 'application/vnd.github+json'
+        }
+    });
+    res.send(response);
+});
+
 module.exports = router;
