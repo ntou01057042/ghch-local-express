@@ -229,27 +229,41 @@ router.post('/create-review', async function (req, res, next) {
     }
 });
 
+
 /* Create a pull request */
 // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#create-a-pull-request
 router.post('/', async function (req, res, next) {
-    const octokit = new Octokit({
-        auth: req.query.token
-    });
-    const response = await octokit.request('POST /repos/{owner}/{repo}/pulls', {
-        owner: req.query.owner,   // The account owner of the repository.
-        repo: req.query.repo,   // The name of the repository without the .git extension.
-        title: req.query.title,   // The title of the new pull request. Required unless issue is specified.
-        body: req.query.body,   // The contents of the pull request.
-        head: req.query.head,   // The name of the branch where your changes are implemented.
-        base: 'main',   // The name of the branch you want the changes pulled into.
-        headers: {
-            'X-GitHub-Api-Version': '2022-11-28',
-            'accept': 'application/vnd.github+json'
+    try {
+        const { owner, repo, title, body, head, token } = req.body;
+        if (!owner || !repo || !title || !head || !token) {
+            return res.status(400).send({ message: 'Missing required parameters' });
         }
-    });
-    // console.log(response);
-    res.send(response);
+        const octokit = new Octokit({
+            auth: token
+        });
+
+        const response = await octokit.request('POST /repos/{owner}/{repo}/pulls', {
+            owner: owner, // The account owner of the repository.
+            repo: repo, // The name of the repository without the .git extension.
+            title: title, // The title of the new pull request. Required unless issue is specified.
+            body: body, // The contents of the pull request.
+            head: head, // The name of the branch where your changes are implemented.
+            base: 'main', // The name of the branch you want the changes pulled into.
+            headers: {
+                'X-GitHub-Api-Version': '2022-11-28',
+                'accept': 'application/vnd.github+json'
+            }
+        });
+
+        res.send(response.data);
+    } catch (error) {
+        console.error(error);
+        res.status(error.status || 500).send({ message: error.message });
+    }
 });
+
+module.exports = router;
+
 
 /* Check if a pull request has been merged */
 // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#check-if-a-pull-request-has-been-merged
