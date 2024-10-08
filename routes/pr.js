@@ -2,6 +2,7 @@ var express = require('express');
 const { Octokit } = require("@octokit/rest");
 var router = express.Router();
 
+
 /* List pull requests */
 // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests
 router.get('/list', async function (req, res, next) {
@@ -30,31 +31,39 @@ router.get('/list', async function (req, res, next) {
     }
     res.send(prs)
 });
-
 /* Get a pull request */
 // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests
 router.get('/get', async function (req, res, next) {
     const octokit = new Octokit({
         auth: req.query.token
-    })
-    const response = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
-        owner: req.query.owner,   // The account owner of the repository.
-        repo: req.query.repo,   // The name of the repository without the .git extension.
-        pull_number: req.query.pull_number,   // The number that identifies the pull request.
-        headers: {
-            'X-GitHub-Api-Version': '2022-11-28',
-            'accept': 'application/vnd.github+json'
-        }
-    })
-    res.send({
-        number: response.data.number,
-        state: response.data.state,
-        description: response.data.body,
-        head: response.data.head.ref,
-        base: response.data.base.ref,
-        creator: response.data.user.login,  // Return the PR creator's username
     });
+
+    try {
+        const response = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
+            owner: req.query.owner,   // The account owner of the repository.
+            repo: req.query.repo,     // The name of the repository without the .git extension.
+            pull_number: req.query.pull_number,   // The number that identifies the pull request.
+            headers: {
+                'X-GitHub-Api-Version': '2022-11-28',
+                'accept': 'application/vnd.github+json'
+            }
+        });
+
+        res.send({
+            number: response.data.number,
+            state: response.data.state,
+            description: response.data.body,
+            head: response.data.head.ref,
+            base: response.data.base.ref,
+            creator: response.data.user.login,  // Return the PR creator's username
+            created_at: response.data.created_at  // Add PR creation time
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(error.status || 500).send({ message: error.message });
+    }
 });
+
 
 /* List issue comments */
 // https://docs.github.com/en/rest/issues/comments?apiVersion=2022-11-28#list-issue-comments
@@ -290,21 +299,71 @@ router.get('/merged-or-not', async function (req, res, next) {
 /* Merge a pull request */
 // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#merge-a-pull-request
 router.post('/merge', async function (req, res, next) {
-    const octokit = new Octokit({
-        auth: req.query.token
-    });
-    const response = await octokit.request('PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge', {
-        owner: req.query.owner,
-        repo: req.query.repo,
-        pull_number: req.query.pull_number,
-        commit_title: req.query.commit_title,  // Title for the automatic commit message.
-        commit_message: req.query.commit_message,  // Extra detail to append to automatic commit message.
-        headers: {
-            'X-GitHub-Api-Version': '2022-11-28',
-            'accept': 'application/vnd.github+json'
+    try {
+        const { owner, repo, pull_number, commit_title, commit_message, token } = req.body;
+
+        if (!owner || !repo || !pull_number || !token) {
+            return res.status(400).send({ message: 'Missing required parameters' });
         }
-    });
-    res.send(response);
+
+        const octokit = new Octokit({
+            auth: token
+        });
+
+        const response = await octokit.request('PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge', {
+            owner: owner,
+            repo: repo,
+            pull_number: pull_number,
+            commit_title: commit_title || `Merged PR #${pull_number}`,  // 默認 commit 標題
+            commit_message: commit_message || '',  // 默認 commit 訊息
+            headers: {
+                'X-GitHub-Api-Version': '2022-11-28',
+                'accept': 'application/vnd.github+json'
+            }
+        });
+
+        res.send(response.data);
+    } catch (error) {
+        console.error(error);
+        res.status(error.status || 500).send({ message: error.message });
+    }
 });
+
+// Check for updated_at timestamp of a pull request
+router.get('/check-updated-at', async function (req, res, next) {
+    try {
+        const { owner, repo, pull_number, token } = req.query;
+
+        if (!owner || !repo || !pull_number || !token) {
+            return res.status(400).send({ message: 'Missing required parameters' });
+        }
+
+        const octokit = new Octokit({
+            auth: token
+        });
+
+        const response = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
+            owner: owner,
+            repo: repo,
+            pull_number: pull_number,
+            headers: {
+                'X-GitHub-Api-Version': '2022-11-28',
+                'accept': 'application/vnd.github+json'
+            }
+        });
+
+        const pullRequest = response.data;
+        const updatedAt = pullRequest.updated_at;
+
+        res.send({
+            message: 'Successfully retrieved PR updated_at timestamp',
+            updated_at: updatedAt
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(error.status || 500).send({ message: error.message });
+    }
+});
+
 
 module.exports = router;
