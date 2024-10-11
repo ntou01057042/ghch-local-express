@@ -1,7 +1,7 @@
 var express = require('express');
 const { Octokit } = require("@octokit/rest");
 var router = express.Router();
-
+const axios = require('axios');
 
 /* List pull requests */
 // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests
@@ -362,6 +362,81 @@ router.get('/check-updated-at', async function (req, res, next) {
     } catch (error) {
         console.error(error);
         res.status(error.status || 500).send({ message: error.message });
+    }
+});
+router.get('/pr-diff', async function (req, res) {
+
+    const { owner, repo, base, head ,token} = req.query;
+
+    if (!owner || !repo || !base || !head|| !token) {
+        return res.status(400).json({ error: 'Missing required parameters: owner, repo, base, head' });
+    }
+    const octokit = new Octokit({
+        auth: token
+    });
+
+    try {
+
+        const response = await octokit.repos.compareCommits({
+            owner: owner,
+            repo: repo,
+            base: base,
+            head: head
+        });
+
+
+        const filesChanged = response.data.files.map(file => ({
+            filename: file.filename,
+            changes: file.changes,
+            patch: file.patch
+        }));
+
+
+        res.status(200).json({
+            status: response.data.status,
+            total_commits: response.data.total_commits,
+            files_changed: filesChanged
+        });
+    } catch (error) {
+        console.error("Error fetching comparison:", error);
+        res.status(500).json({ error: 'An error occurred while fetching the comparison.' });
+    }
+});
+router.post('/generate-pr', async function (req, res) {
+    try {
+
+        if (!req.body || !req.body.prompt || !req.body.diffMessage) {
+            return res.status(400).send({ message: 'Prompt and diffMessage are required' });
+        }
+
+        console.log('Prompt:', req.body.prompt);
+        console.log('Diff Message:', req.body.diffMessage+"結束");
+
+        const apiKey = '';
+        const userInput = req.body.prompt;
+
+
+        const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+            model: 'gpt-3.5-turbo',
+            messages: [{ role: 'user', content: `${userInput}\n\nDiff Message:\n${req.body.diffMessage}` }],
+            max_tokens: 100
+        }, {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const generatedAnswer = response.data.choices[0].message.content.trim();
+
+        res.send({
+            message: 'Successfully generated answer',
+            answer: generatedAnswer
+        });
+    } catch (error) {
+
+        console.error(error.message);
+        res.send({ message: error.message });
     }
 });
 
