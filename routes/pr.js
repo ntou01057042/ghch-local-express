@@ -405,21 +405,45 @@ router.get('/pr-diff', async function (req, res) {
 router.post('/generate-pr', async function (req, res) {
     try {
 
+        // 檢查請求體是否包含 prompt 和 diffMessage
         if (!req.body || !req.body.prompt || !req.body.diffMessage) {
             return res.status(400).send({ message: 'Prompt and diffMessage are required' });
         }
 
         console.log('Prompt:', req.body.prompt);
-        console.log('Diff Message:', req.body.diffMessage+"結束");
+        console.log('Diff Message:', req.body.diffMessage + "結束");
 
+        // OpenAI API 密鑰
         const apiKey = '';
-        const userInput = req.body.prompt;
 
+        // 將 diffMessage 包含到 prompt 中
+        const userInput = `
+        請根據下列 diff 描述生成 pull request 的標題和描述，並以 JSON 格式回傳結果，包含以下欄位：
+        {
+          "title": "這是pull request的標題",
+          "summary": "這是pull request的摘要",
+          "fileChanges": [
+            {
+              "fileName": "變更檔案的名稱",
+              "changes": "這是針對該檔案的變更描述"
+            }
+          ],
+          "improvements": [
+            {
+              "feature": "功能名稱",
+              "description": "功能改進的描述"
+            }
+          ]
+        }
+        請根據下列diff內容撰寫：
+        \n\n${req.body.diffMessage}
+        `;
 
+        // 發送 API 請求到 OpenAI
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: 'gpt-3.5-turbo',
-            messages: [{ role: 'user', content: `${userInput}\n\nDiff Message:\n${req.body.diffMessage}` }],
-            max_tokens: 100
+            messages: [{ role: 'user', content: userInput }],
+            max_tokens: 500 // 可以根據需求調整
         }, {
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
@@ -427,16 +451,17 @@ router.post('/generate-pr', async function (req, res) {
             }
         });
 
+        // 獲取生成的回答
         const generatedAnswer = response.data.choices[0].message.content.trim();
 
+        // 回傳結果
         res.send({
             message: 'Successfully generated answer',
             answer: generatedAnswer
         });
     } catch (error) {
-
         console.error(error.message);
-        res.send({ message: error.message });
+        res.status(500).send({ message: 'Error generating PR description', error: error.message });
     }
 });
 
