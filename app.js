@@ -8,6 +8,7 @@ var indexRouter = require('./routes/index');
 var repoRouter = require('./routes/repo');
 var collaboratorRouter = require('./routes/collab');
 var prRouter = require('./routes/pr');
+var branchRouter = require('./routes/branch');
 
 var app = express();
 
@@ -22,5 +23,6 @@ app.use('/', indexRouter);
 app.use('/repo', repoRouter);
 app.use('/collab', collaboratorRouter);
 app.use('/pr', prRouter);
+app.use('/branch', branchRouter);
 
 module.exports = app;
