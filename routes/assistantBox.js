@@ -1,6 +1,7 @@
 var express = require('express');
 var router = express.Router();
 const axios = require('axios');
+const { openAiApiKey } = require('../config'); // 調整路徑以符合你的檔案結構
 
 // 問答功能路由
 router.post('/ask', async function (req, res) {
@@ -12,8 +13,6 @@ router.post('/ask', async function (req, res) {
 
         console.log('Prompt:', req.body.prompt);
 
-        // OpenAI API 密鑰
-        const apiKey = '';
         // 使用者的問題
         const userInput = req.body.prompt;
 
@@ -33,7 +32,7 @@ router.post('/ask', async function (req, res) {
             max_tokens: 500 // 可以根據需求調整
         }, {
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
+                'Authorization': `Bearer ${openAiApiKey}`, // 使用導入的 API 密鑰
                 'Content-Type': 'application/json'
             }
         });
