@@ -31,6 +31,45 @@ router.get('/list', async function (req, res, next) {
     }
     res.send(prs)
 });
+
+router.get('/check-pr', async function (req, res, next) {
+    const { owner, repo, head, token } = req.query;
+
+    if (!owner || !repo || !head || !token) {
+        return res.status(400).json({ error: 'Missing required parameters: owner, repo, head' });
+    }
+
+    const octokit = new Octokit({
+        auth: token
+    });
+
+    try {
+        // 查詢該 repository 的所有 PR，並篩選 head branch
+        const response = await octokit.request('GET /repos/{owner}/{repo}/pulls', {
+            owner: owner,
+            repo: repo,
+            state: 'open', // 查詢所有打開的 PR
+            headers: {
+                'X-GitHub-Api-Version': '2022-11-28',
+                'accept': 'application/vnd.github+json'
+            }
+        });
+
+        // 檢查是否有 PR 的 head branch 是指定的 branch
+        const existingPR = response.data.find(pr => pr.head.ref === head);
+
+        if (existingPR) {
+            res.json({ hasPR: true, prNumber: existingPR.number, prUrl: existingPR.html_url });
+        } else {
+            res.json({ hasPR: false });
+        }
+    } catch (error) {
+        console.error('Error checking PR:', error);
+        res.status(500).json({ error: 'Error checking for existing PR' });
+    }
+});
+
+
 /* Get a pull request */
 // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests
 router.get('/get', async function (req, res, next) {
@@ -92,7 +131,6 @@ router.get('/comments', async function (req, res, next) {
     }
     res.send(comments);
 });
-
 /* List PR reviewers */
 router.get('/reviewers', async function (req, res, next) {
     const octokit = new Octokit({
@@ -137,7 +175,8 @@ router.get('/reviewers', async function (req, res, next) {
         reviewsResponse.data.forEach(review => {
             reviewers.push({
                 user: review.user.login,
-                state: review.state  // The state can be APPROVED, CHANGES_REQUESTED, or COMMENTED
+                state: review.state,  // The state can be APPROVED, CHANGES_REQUESTED, or COMMENTED
+                review_id: review.id  // Add the review ID to the response
             });
         });
     }
@@ -238,6 +277,47 @@ router.post('/create-review', async function (req, res, next) {
     }
 });
 
+/* 更新審查 API */
+router.post('/update-review', async function (req, res, next) {
+    const { owner, repo, pull_number, review_id, body, event, token } = req.body;
+
+    if (!owner || !repo || !pull_number || !review_id || !token) {
+        return res.status(400).send({ message: 'Missing required parameters' });
+    }
+
+    const octokit = new Octokit({
+        auth: token
+    });
+
+    try {
+        // 更新審查
+        const response = await octokit.request('PUT /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}', {
+            owner: owner,
+            repo: repo,
+            pull_number: pull_number,
+            review_id: review_id,  // 要更新的審查編號
+            body: body,            // 審查的評論內容
+            event: event,          // 'APPROVE', 'REQUEST_CHANGES', or 'COMMENT'
+            headers: {
+                'X-GitHub-Api-Version': '2022-11-28',
+                'accept': 'application/vnd.github+json'
+            }
+        });
+
+        res.json({
+            message: 'Review successfully updated',
+            review_id: response.data.id,
+            user: response.data.user.login,
+            body: response.data.body,
+            state: response.data.state,
+            html_url: response.data.html_url
+        });
+    } catch (error) {
+        console.error("Error updating review:", error);
+        res.status(500).send({ error: 'An error occurred while updating the review.' });
+    }
+});
+
 
 /* Create a pull request */
 // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#create-a-pull-request
@@ -264,14 +344,13 @@ router.post('/', async function (req, res, next) {
             }
         });
 
-        res.send(response.data);
+        const pullNumber = response.data.number;
+        res.send({ pullNumber: pullNumber, prData: response.data });
     } catch (error) {
         console.error(error);
         res.status(error.status || 500).send({ message: error.message });
     }
 });
-
-module.exports = router;
 
 
 /* Check if a pull request has been merged */
@@ -404,22 +483,49 @@ router.get('/pr-diff', async function (req, res) {
 });
 router.post('/generate-pr', async function (req, res) {
     try {
-
+        // 檢查請求體是否包含 prompt 和 diffMessage
         if (!req.body || !req.body.prompt || !req.body.diffMessage) {
             return res.status(400).send({ message: 'Prompt and diffMessage are required' });
         }
 
         console.log('Prompt:', req.body.prompt);
-        console.log('Diff Message:', req.body.diffMessage+"結束");
+        console.log('Diff Message:', req.body.diffMessage + "結束");
 
+        // OpenAI API 密鑰
         const apiKey = '';
-        const userInput = req.body.prompt;
+        // 將 diffMessage 包含到 prompt 中，並要求生成 AI reviewer 的評論
+        const userInput = `
+        請根據下列 diff 描述生成 pull request 的標題和描述，並以 JSON 格式回傳結果，包含以下欄位：
+        {
+          "title": "這是pull request的標題",
+          "summary": "這是pull request的摘要",
+          "fileChanges": [
+            {
+              "fileName": "變更檔案的名稱",
+              "changes": "這是針對該檔案的變更描述"
+            }
+          ],
+          "improvements": [
+            {
+              "feature": "功能名稱",
+              "description": "功能改進的描述"
+            }
+          ],
+          "aiReviewComment": {
+              "reviewer": "AI Reviewer",
+              "comment": "這是AI reviewer對這個PR的評論"
+          },
+          "mergeApproval": "這是AI是否同意合併的判斷:APPROVED or CHANGES_REQUESTED"
+        }
+        請根據下列 diff 內容撰寫：
+        \n\n${req.body.diffMessage}
+        `;
 
-
+        // 發送 API 請求到 OpenAI
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: 'gpt-3.5-turbo',
-            messages: [{ role: 'user', content: `${userInput}\n\nDiff Message:\n${req.body.diffMessage}` }],
-            max_tokens: 100
+            messages: [{ role: 'user', content: userInput }],
+            max_tokens: 500 // 可以根據需求調整
         }, {
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
@@ -427,18 +533,20 @@ router.post('/generate-pr', async function (req, res) {
             }
         });
 
+        // 獲取生成的回答
         const generatedAnswer = response.data.choices[0].message.content.trim();
 
+        // 回傳結果
         res.send({
             message: 'Successfully generated answer',
             answer: generatedAnswer
         });
     } catch (error) {
-
         console.error(error.message);
-        res.send({ message: error.message });
+        res.status(500).send({ message: 'Error generating PR description', error: error.message });
     }
 });
+
 
 
 module.exports = router;
