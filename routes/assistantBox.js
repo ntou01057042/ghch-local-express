@@ -22,7 +22,7 @@ router.post('/ask', async function (req, res) {
             messages: [
                 {
                     role: 'system',
-                    content: '你是一個專業的版本控制系統問答小幫手，請你回答符合 GitHub Flow 的建議。'
+                    content: '你是一個專業的版本控制系統問答小幫手，請你回答符合 GitHub Flow 的建議，請生成300字以內。'
                 },
                 {
                     role: 'user',
