@@ -2,23 +2,22 @@ var express = require('express');
 const { Octokit } = require("@octokit/rest");
 var router = express.Router();
 const axios = require('axios');
-
+const { openAiApiKey } = require('../config');
 /* List pull requests */
 // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests
-/* List pull requests */
 router.get('/list', async function (req, res, next) {
     const octokit = new Octokit({
         auth: req.query.token
-    });
+    })
     const response = await octokit.request('GET /repos/{owner}/{repo}/pulls', {
-        owner: req.query.owner,
-        repo: req.query.repo,
-        state: 'all',
+        owner: req.query.owner,   // The account owner of the repository.
+        repo: req.query.repo,   // The name of the repository without the .git extension.
+        state: 'all',   // Either open, closed, or all to filter by state.
         headers: {
             'X-GitHub-Api-Version': '2022-11-28',
             'accept': 'application/vnd.github+json'
         }
-    });
+    })
     console.log(response);
     let prs = [];
     for (const i in response.data) {
@@ -30,11 +29,9 @@ router.get('/list', async function (req, res, next) {
             title: response.data[i].title,
         });
     }
-    res.send({
-        timestamp: new Date().toISOString(), // Add timestamp
-        pullRequests: prs // Wrap PRs in an object
-    });
+    res.send(prs)
 });
+
 router.get('/check-pr', async function (req, res, next) {
     const { owner, repo, head, token } = req.query;
 
@@ -47,30 +44,24 @@ router.get('/check-pr', async function (req, res, next) {
     });
 
     try {
+        // 查詢該 repository 的所有 PR，並篩選 head branch
         const response = await octokit.request('GET /repos/{owner}/{repo}/pulls', {
             owner: owner,
             repo: repo,
-            state: 'open',
+            state: 'open', // 查詢所有打開的 PR
             headers: {
                 'X-GitHub-Api-Version': '2022-11-28',
                 'accept': 'application/vnd.github+json'
             }
         });
 
+        // 檢查是否有 PR 的 head branch 是指定的 branch
         const existingPR = response.data.find(pr => pr.head.ref === head);
 
         if (existingPR) {
-            res.json({
-                timestamp: new Date().toISOString(), // Add timestamp
-                hasPR: true,
-                prNumber: existingPR.number,
-                prUrl: existingPR.html_url
-            });
+            res.json({ hasPR: true, prNumber: existingPR.number, prUrl: existingPR.html_url });
         } else {
-            res.json({
-                timestamp: new Date().toISOString(), // Add timestamp
-                hasPR: false
-            });
+            res.json({ hasPR: false });
         }
     } catch (error) {
         console.error('Error checking PR:', error);
@@ -453,9 +444,10 @@ router.get('/check-updated-at', async function (req, res, next) {
     }
 });
 router.get('/pr-diff', async function (req, res) {
-    const { owner, repo, base, head, token } = req.query;
 
-    if (!owner || !repo || !base || !head || !token) {
+    const { owner, repo, base, head ,token} = req.query;
+
+    if (!owner || !repo || !base || !head|| !token) {
         return res.status(400).json({ error: 'Missing required parameters: owner, repo, base, head' });
     }
     const octokit = new Octokit({
@@ -463,6 +455,7 @@ router.get('/pr-diff', async function (req, res) {
     });
 
     try {
+
         const response = await octokit.repos.compareCommits({
             owner: owner,
             repo: repo,
@@ -470,14 +463,15 @@ router.get('/pr-diff', async function (req, res) {
             head: head
         });
 
+
         const filesChanged = response.data.files.map(file => ({
             filename: file.filename,
             changes: file.changes,
             patch: file.patch
         }));
 
+
         res.status(200).json({
-            timestamp: new Date().toISOString(), // Add timestamp
             status: response.data.status,
             total_commits: response.data.total_commits,
             files_changed: filesChanged
@@ -497,8 +491,6 @@ router.post('/generate-pr', async function (req, res) {
         console.log('Prompt:', req.body.prompt);
         console.log('Diff Message:', req.body.diffMessage + "結束");
 
-        // OpenAI API 密鑰
-        const apiKey = '';
         // 將 diffMessage 包含到 prompt 中，並要求生成 AI reviewer 的評論
         const userInput = `
         請根據下列 diff 描述生成 pull request 的標題和描述，並以 JSON 格式回傳結果，包含以下欄位：
@@ -534,7 +526,7 @@ router.post('/generate-pr', async function (req, res) {
             max_tokens: 500 // 可以根據需求調整
         }, {
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
+                'Authorization': `Bearer ${openAiApiKey}`,
                 'Content-Type': 'application/json'
             }
         });

@@ -9,6 +9,7 @@ var repoRouter = require('./routes/repo');
 var collaboratorRouter = require('./routes/collab');
 var prRouter = require('./routes/pr');
 var branchRouter = require('./routes/branch');
+var assistantBoxRouter = require('./routes/assistantBox');
 
 var app = express();
 
@@ -24,5 +25,6 @@ app.use('/repo', repoRouter);
 app.use('/collab', collaboratorRouter);
 app.use('/pr', prRouter);
 app.use('/branch', branchRouter);
+app.use('/assistantBox', assistantBoxRouter);
 
 module.exports = app;
